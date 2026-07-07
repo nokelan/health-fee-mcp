@@ -2,3 +2,4 @@ fastapi
 uvicorn
 pdfplumber
 fastapi-mcp
+chromadb

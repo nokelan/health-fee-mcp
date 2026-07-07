@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .env
 venv/
+chroma_db/
+qa_log.jsonl
+*.bak
+*.log
+nohup.out

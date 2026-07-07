@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건강보험 AI 챗봇</title>
+<style>
+  :root {
+    --dark: #1a1a1a;
+    --mid: #666666;
+    --muted: #888888;
+    --border: #e0e0e0;
+    --bg: #f5f5f5;
+    --card: #ffffff;
+    --text: #1a1a1a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(160deg, #ffffff 0%, #efefef 100%) fixed;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 60%, #555555 100%);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header span { font-size: 13px; color: #aaa; }
+
+  .api-bar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .api-bar label { font-size: 13px; color: var(--mid); white-space: nowrap; }
+  .api-bar input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: monospace;
+  }
+  .api-bar button {
+    padding: 6px 16px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .api-bar button:hover { background: #1a1a1a; }
+
+  .chat-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 16px;
+    gap: 16px;
+  }
+
+  #messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 300px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .msg {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .msg.user { flex-direction: row-reverse; }
+  .bubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user .bubble {
+    background: #333;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.ai .bubble {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #555;
+    color: #fff;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .msg.user .avatar { background: #333; }
+
+  .typing { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  .input-area {
+    display: flex;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  #userInput {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    resize: none;
+    font-family: inherit;
+    padding: 4px 8px;
+    max-height: 120px;
+    min-height: 40px;
+  }
+  #sendBtn {
+    padding: 8px 20px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    align-self: flex-end;
+  }
+  #sendBtn:hover { background: #1a1a1a; }
+  #sendBtn:disabled { background: #ccc; cursor: not-allowed; }
+
+  .hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 0 0;
+  }
+  .error-msg {
+    background: #fff3f3;
+    border: 1px solid #f5c6c6;
+    color: #c0392b;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .sources {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f8f8f8;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #666;
+    max-width: 75%;
+    margin-left: 42px;
+  }
+  .sources b { color: #333; font-size: 12px; }
+  .source-item {
+    margin-top: 4px;
+    padding: 4px 0;
+    border-top: 1px solid #eee;
+    line-height: 1.4;
+  }
+  .source-item:first-of-type { border-top: none; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>건강보험 AI 챗봇</h1>
+    <span>Gemini 기반 / 수가·요양급여 전문</span>
+  </div>
+</header>
+
+<div id="serverStatus" style="background:#e8f5ee;border-bottom:1px solid #b0d8c0;padding:8px 24px;font-size:12px;color:#2e7d52;">
+  서버 API 키 사용 중 — 개인 키 불필요
+</div>
+<div class="api-bar" id="apiBanner" style="display:none;">
+  <label style="color:#b00020;font-weight:600;">서버 한도 초과</label>
+  <input type="password" id="apiKey" placeholder="개인 Gemini API 키 (AIzaSy...)" />
+  <button onclick="saveKey()">저장 후 사용</button>
+</div>
+
+<div class="chat-wrap">
+  <div id="messages">
+    <div class="msg ai">
+      <div class="avatar">AI</div>
+      <div class="bubble">안녕하세요. 건강보험 수가 및 요양급여 관련 질문에 답변드립니다.
+질문을 입력하시면 바로 답변합니다.</div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <textarea id="userInput" placeholder="질문을 입력하세요... (Shift+Enter: 줄바꿈, Enter: 전송)" rows="1"></textarea>
+    <button id="sendBtn" onclick="send()">전송</button>
+  </div>
+  <div class="hint">Shift+Enter: 줄바꿈 | Enter: 전송</div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `당신은 건강보험 수가 및 요양급여비용 전문가입니다.
+병원 원무팀과 청구 담당자를 돕는 AI 비서 역할을 합니다.
+
+답변 원칙 (절대 준수):
+1. 수가·가산율·청구코드·급여기준·산정기준·포괄수가·신포괄 관련 질문은 반드시 search_health_fee 도구로 DB를 먼저 조회한다.
+2. search_health_fee 결과가 없거나 부족하면 vector_search_health_fee 도구로 의미론적 검색을 추가 수행한다.
+3. 두 검색 모두 결과가 없으면 "DB에 해당 정보가 없습니다. 심평원 자료를 직접 확인하세요."라고만 답한다. 추가 설명 금지.
+4. DB에 없는 구체적 수치, 코드, 기준을 절대 만들어내지 않는다.
+5. 모르면 "모릅니다", 없으면 "DB에 없습니다"라고 명확히 답한다.
+6. DB 조회 결과가 있을 때만 해당 내용을 근거로 답변한다.
+7. 답변은 간결하고 실무적으로`;
+
+const history = [];
+let apiKey = localStorage.getItem('gemini_api_key') || '';
+
+window.onload = () => {
+  const el = document.getElementById('apiKey');
+  if (apiKey && el) el.value = apiKey;
+};
+
+function saveKey() {
+  apiKey = document.getElementById('apiKey').value.trim();
+  localStorage.setItem('gemini_api_key', apiKey);
+  alert('API 키 저장 완료');
+}
+
+document.getElementById('userInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+  div.innerHTML = `
+    <div class="avatar">${role === 'user' ? '나' : 'AI'}</div>
+    <div class="bubble">${role === 'user' ? escHtml(text) : renderMd(text)}</div>`;
+  document.getElementById('messages').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  return div;
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.id = 'typing';
+  div.innerHTML = `<div class="avatar">AI</div><div class="bubble typing">답변 생성 중...</div>`;
+  document.getElementById('messages').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function renderMd(s) {
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/\*(.+?)\*/g,'<i>$1</i>')
+    .replace(/^### (.+)$/gm,'<b>$1</b>')
+    .replace(/^## (.+)$/gm,'<b>$1</b>')
+    .replace(/^# (.+)$/gm,'<b>$1</b>')
+    .replace(/\n/g,'<br>');
+}
+
+let lastSources = [];
+
+const TOOLS = [{
+  function_declarations: [
+    {
+      name: 'search_health_fee',
+      description: '건강보험 수가표, 요양급여비용, 청구방법을 키워드로 DB 검색합니다. 수가·가산율·청구코드·급여기준 질문에 먼저 사용하세요.',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: { type: 'string', description: '검색 키워드 (예: 마취료 소아 가산)' },
+          year:    { type: 'string', description: '연도 필터 (예: 2026). 미입력 시 전체' }
+        },
+        required: ['keyword']
+      }
+    },
+    {
+      name: 'vector_search_health_fee',
+      description: '의미론적 벡터 검색으로 DB를 검색합니다. search_health_fee 결과가 없거나 부족할 때 보완 검색으로 사용하세요.',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: { type: 'string', description: '검색할 의미/개념 (예: 소아 마취 연령별 가산율)' },
+          doc_type: { type: 'string', description: '문서유형 필터 (예: fee_schedule, drg_guide). 미입력 시 전체' },
+          year:     { type: 'string', description: '연도 필터 (예: 2026). 미입력 시 전체' }
+        },
+        required: ['keyword']
+      }
+    }
+  ]
+}];
+
+async function callHealthFee(args) {
+  const params = new URLSearchParams({ keyword: args.keyword, limit: 5 });
+  if (args.year) params.append('year', args.year);
+  const res = await fetch(`https://health.autotaxsystem.co.kr/search?${params}`);
+  return await res.json();
+}
+
+async function callVSearch(args) {
+  const params = new URLSearchParams({ keyword: args.keyword, limit: 5 });
+  if (args.year) params.append('year', args.year);
+  if (args.doc_type) params.append('doc_type', args.doc_type);
+  const res = await fetch(`https://health.autotaxsystem.co.kr/vsearch?${params}`);
+  return await res.json();
+}
+
+function updateTyping(text) {
+  const t = document.getElementById('typing');
+  if (t) t.querySelector('.bubble').textContent = text;
+}
+
+async function send() {
+  const input = document.getElementById('userInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+
+  addMsg('user', text);
+  history.push({ role: 'user', parts: [{ text }] });
+
+  addTyping();
+
+  try {
+    // Function calling 루프 (최대 3회)
+    for (let i = 0; i < 3; i++) {
+      const geminiBody = {
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: history,
+        tools: TOOLS,
+        tool_config: { function_calling_config: { mode: 'AUTO' } },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 8192 }
+      };
+
+      const useProxy = !apiKey;
+      const url = useProxy
+        ? '/chat_proxy'
+        : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const body = useProxy
+        ? JSON.stringify({ body: geminiBody })
+        : JSON.stringify(geminiBody);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 429 || res.status === 503) {
+          document.getElementById('serverStatus').style.display = 'none';
+          document.getElementById('apiBanner').style.display = 'flex';
+          removeTyping();
+          addMsg('ai', '서버 일일 한도가 초과되었습니다.\n상단에 개인 Gemini API 키를 입력하면 계속 사용할 수 있습니다.\n(무료 발급: aistudio.google.com)');
+          document.getElementById('sendBtn').disabled = false;
+          return;
+        }
+        throw new Error(data.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const candidate = data.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+
+      // 함수 호출 요청이 있으면 실행
+      const fnCall = parts.find(p => p.functionCall);
+      if (fnCall) {
+        const { name, args } = fnCall.functionCall;
+        const isVector = name === 'vector_search_health_fee';
+        updateTyping(`${isVector ? '벡터' : 'DB'} 검색 중: "${args.keyword}"...`);
+
+        history.push({ role: 'model', parts });
+
+        const fnResult = isVector ? await callVSearch(args) : await callHealthFee(args);
+        if (fnResult.results) lastSources = fnResult.results;
+        history.push({
+          role: 'user',
+          parts: [{ functionResponse: { name, response: fnResult } }]
+        });
+        continue;
+      }
+
+      // 텍스트 응답
+      const reply = parts.find(p => p.text)?.text || '응답 없음';
+      history.push({ role: 'model', parts: [{ text: reply }] });
+      removeTyping();
+      addMsg('ai', reply);
+
+      // Q&A 자동 저장
+      fetch('https://health.autotaxsystem.co.kr/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text, answer: reply, sources: lastSources })
+      }).catch(() => {});
+
+      // 출처 표시
+      if (lastSources.length > 0) {
+        const srcDiv = document.createElement('div');
+        srcDiv.className = 'sources';
+        srcDiv.innerHTML = '<b>참조 출처</b>' + lastSources.map(s =>
+          `<div class="source-item">${s.year} ${s.doc_type} &gt; ${s.section || ''}<br><span style="color:#888">${(s.snippet||'').replace(/▶/g,'<b>').replace(/◀/g,'</b>').substring(0,80)}...</span></div>`
+        ).join('');
+        document.getElementById('messages').appendChild(srcDiv);
+        srcDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        lastSources = [];
+      }
+      break;
+    }
+
+  } catch (err) {
+    removeTyping();
+    const div = document.createElement('div');
+    div.className = 'error-msg';
+    div.textContent = '오류: ' + err.message;
+    document.getElementById('messages').appendChild(div);
+  }
+
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+
+// textarea 자동 높이 조절
+document.getElementById('userInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+</script>
+</body>
+</html>
